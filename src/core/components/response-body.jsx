@@ -21,7 +21,7 @@ export default class ResponseBody extends React.PureComponent {
   }
 
   updateParsedContent = (prevContent) => {
-    const { content } = this.props
+    const { content, contentType } = this.props
 
     if(prevContent === content) {
       return
@@ -34,7 +34,11 @@ export default class ResponseBody extends React.PureComponent {
           parsedContent: reader.result
         })
       }
-      reader.readAsText(content)
+      if (/x-jackson-smile/i.test(contentType)) {
+        reader.readAsArrayBuffer(content)
+      } else {
+        reader.readAsText(content)
+      }
     } else {
       this.setState({
         parsedContent: content.toString()
@@ -95,6 +99,27 @@ export default class ResponseBody extends React.PureComponent {
       }
 
       // Anything else (CORS)
+    } else if(/x-jackson-smile/i.test(contentType)) {
+      // We were able to squeeze something out of content
+      // in `updateParsedContent`, so let's display it
+      let parsedSmileContent;
+      if (parsedContent !== null) {
+        parsedSmileContent = window.Smile.Parser.parse(parsedContent)
+      }
+
+      // JSON
+      let language = null
+      let testValueForJson = getKnownSyntaxHighlighterLanguage(parsedSmileContent)
+      if (testValueForJson) {
+        language = "json"
+      }
+      try {
+        body = JSON.stringify(parsedSmileContent, null, "  ")
+      } catch (error) {
+        body = "can't parse JSON.  Raw result:\n\n" + parsedSmileContent
+      }
+
+      bodyEl = <HighlightCode language={language} downloadable fileName={`${downloadName}.json`} value={ body } getConfigs={ getConfigs } canCopy />
     } else if (/json/i.test(contentType)) {
       // JSON
       let language = null
